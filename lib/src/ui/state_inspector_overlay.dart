@@ -653,7 +653,9 @@ class _TimelineList extends StatelessWidget {
         final isPinned = pinnedIds.contains(record.id);
 
         return Material(
-          color: isSelected ? color.withAlpha((0.08 * 255).round()) : Colors.transparent,
+          color: isSelected
+              ? color.withAlpha((0.08 * 255).round())
+              : Colors.transparent,
           child: ListTile(
             dense: true,
             leading: Icon(_iconFor(record.kind), color: color, size: 20),
@@ -936,7 +938,7 @@ class _JsonSection extends StatelessWidget {
           constraints: const BoxConstraints(maxHeight: 160),
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: scheme.surfaceVariant,
+            color: _surfaceContainerColor(scheme),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Scrollbar(
@@ -981,7 +983,7 @@ class _DiffSection extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceVariant,
+                color: _surfaceContainerColor(Theme.of(context).colorScheme),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: SingleChildScrollView(
@@ -1003,6 +1005,23 @@ class _DiffSection extends StatelessWidget {
       ],
     );
   }
+}
+
+Color _surfaceContainerColor(ColorScheme scheme) {
+  final dynamic dynamicScheme = scheme;
+  try {
+    final result = dynamicScheme.surfaceContainerHighest;
+    if (result is Color) {
+      return result;
+    }
+  } catch (_) {}
+  try {
+    final variant = dynamicScheme.surfaceVariant;
+    if (variant is Color) {
+      return variant;
+    }
+  } catch (_) {}
+  return scheme.surface;
 }
 
 class _DiffRow extends StatelessWidget {
