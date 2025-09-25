@@ -195,37 +195,19 @@ class MyGetxController extends GetxController {
 }
 ```
 
-## Example app
+## Example demo
 
-Run the bundled sample to see the overlay in action:
+![Timeline overlay showing Riverpod and Bloc events](screenshots/Screenshot_20250925_235623.jpg)
+*Floating inspector pinned to the right, streaming Riverpod & Bloc updates while the app stays interactive.*
 
-```bash
-cd example
-# macOS/Linux (optional): install a known-good JDK 17 for Android builds
-./android/scripts/fetch-jdk17.sh
-flutter run
-```
+![Diff view and structured state snapshots](screenshots/Screenshot_20250926_001325.jpg)
+*Detail panel highlighting structured diffs, previous/current JSON snapshots, and metadata for a selected event.*
 
-The demo showcases a Riverpod `StateNotifier` (returning a serialisable object), a Bloc
-counter, and a GetX controller whose `Rx<int>` + `RxList<int>` are observed via the new adapter.
-Interact with the counters, pause/resume capture, search, pin frames, filter event kinds, or
-export/import the collected timeline straight from the UI.
+![Search, filters, and GetX stream capture](screenshots/Screenshot_20250926_001344.jpg)
+*Timeline search, event-kind filters, and a GetX counter emitting into the same session.*
 
-> Windows users: ensure `JAVA_HOME` points to a JDK 17 installation before running
-> `flutter build apk`. For example:
-> ```powershell
-> $env:JAVA_HOME = "C:\\Program Files\\Java\\jdk-17"
-> flutter build apk --debug
-> ```
-
-## Publish checklist
-
-- [ ] Update `pubspec.yaml` version and ensure it matches `CHANGELOG.md`.
-- [ ] Capture fresh screenshots/gifs of the overlay for the README.
-- [ ] Run `flutter format .`, `flutter analyze`, and `flutter test` from the
-      package root.
-- [ ] Verify the example app builds on your supported platforms.
-- [ ] Fill in the LICENSE owner and repository metadata before publishing.
+![Animated walk-through of the inspector overlay](screenshots/movie.gif)
+*Animation: opening the overlay, pausing capture, pinning events, exporting sessions, and navigating diffs.*
 
 ## Support & feedback
 
