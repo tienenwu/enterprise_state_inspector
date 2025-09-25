@@ -66,7 +66,8 @@ class _StateInspectorOverlayState extends State<StateInspectorOverlay> {
   @override
   void didUpdateWidget(covariant StateInspectorOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final nextController = widget.controller ?? StateInspectorController.instance;
+    final nextController =
+        widget.controller ?? StateInspectorController.instance;
     if (!identical(nextController, _controller)) {
       _controller.removeListener(_handleControllerChanged);
       _controller = nextController;
@@ -307,8 +308,7 @@ class _InspectorToggleButton extends StatelessWidget {
               right: 0,
               top: 0,
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 decoration: BoxDecoration(
                   color: Colors.deepPurple,
                   borderRadius: BorderRadius.circular(8),
@@ -386,7 +386,7 @@ class _StateInspectorPanel extends StatelessWidget {
     return Material(
       elevation: 12,
       borderRadius: BorderRadius.circular(12),
-      color: surfaceColor.withOpacity(0.98),
+      color: surfaceColor.withAlpha((0.98 * 255).round()),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Column(
@@ -653,7 +653,7 @@ class _TimelineList extends StatelessWidget {
         final isPinned = pinnedIds.contains(record.id);
 
         return Material(
-          color: isSelected ? color.withOpacity(0.08) : Colors.transparent,
+          color: isSelected ? color.withAlpha((0.08 * 255).round()) : Colors.transparent,
           child: ListTile(
             dense: true,
             leading: Icon(_iconFor(record.kind), color: color, size: 20),
@@ -665,7 +665,8 @@ class _TimelineList extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.w500,
                     ),
                   ),
                 ),
@@ -881,6 +882,7 @@ class _DetailSectionState extends State<_DetailSection> {
     );
   }
 }
+
 class _DetailRow extends StatelessWidget {
   const _DetailRow({required this.label, required this.value});
 
@@ -1002,6 +1004,7 @@ class _DiffSection extends StatelessWidget {
     );
   }
 }
+
 class _DiffRow extends StatelessWidget {
   const _DiffRow({required this.entry});
 
