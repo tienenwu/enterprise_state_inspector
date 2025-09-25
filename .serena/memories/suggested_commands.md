@@ -1,0 +1,5 @@
+- `flutter pub get` – install/update package dependencies.
+- `flutter analyze` – run static analysis across the package and example.
+- `flutter test` – execute unit tests under `test/`.
+- `flutter format .` – apply Dart formatter to the repo (run before publishing).
+- `cd example && flutter run` – launch the bundled demo showcasing the inspector overlay.

@@ -1,0 +1,4 @@
+- Ensure `flutter pub get` succeeds after dependency changes.
+- Run `flutter analyze` and `flutter test` from the package root; resolve issues before handing off.
+- If UI/behavior changes, rebuild or smoke-test the `example/` app (`cd example && flutter run`).
+- Update README/CHANGELOG/version when shipping user-facing features; keep MIT license header accurate.

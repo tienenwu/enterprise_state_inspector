@@ -1,0 +1,4 @@
+- Lints: `analysis_options.yaml` includes `package:flutter_lints/flutter.yaml`; follow standard Flutter/Dart style (e.g., prefer const constructors, avoid unused imports).
+- Code organization: package-level exports via `lib/enterprise_state_inspector.dart`, internal code lives under `lib/src/` in feature-based folders.
+- UI: overlay built with Material widgets and uses concise documentation comments; add targeted comments only when logic is non-obvious.
+- Naming: descriptive class/file names tied to responsibilities (e.g., `StateInspectorController`, `StateInspectorRiverpodObserver`).

@@ -1,0 +1,5 @@
+- Purpose: Flutter package offering a runtime state inspector overlay that records timeline events from Riverpod providers and Bloc/Cubit instances for debugging complex apps.
+- Tech stack: Dart/Flutter package; integrates with `flutter_bloc` and `flutter_riverpod`.
+- Key modules: controller (`lib/src/controller/state_inspector_controller.dart`) managing timelines; adapters (`lib/src/adapters`) bridging Riverpod/Bloc events; UI overlay (`lib/src/ui/state_inspector_overlay.dart`); models/utilities under `lib/src/model` and `lib/src/util`.
+- Ancillary assets: Example app in `example/` demonstrating integration; unit tests for controller/adapters in `test/`.
+- Licensing: MIT (LICENSE file).
