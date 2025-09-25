@@ -1,3 +1,8 @@
+## 0.1.1
+
+- Incremental release with README image assets included in the package.
+- Bumped homepage to https://tienenwu.me/ and kept API unchanged.
+
 ## 0.1.0-dev.1
 
 - Initial preview release with Riverpod and Bloc observers feeding the inspector timeline.

@@ -64,16 +64,16 @@ complex flows without leaving the app.
 
 ## Screenshots & demo
 
-![Timeline overlay showing Riverpod and Bloc events](../screenshots/Screenshot_20250925_235623.jpg)
+![Timeline overlay showing Riverpod and Bloc events](screenshots/Screenshot_20250925_235623.jpg)
 *Floating inspector pinned to the right, streaming Riverpod & Bloc updates while the app stays interactive.*
 
-![Diff view and structured state snapshots](../screenshots/Screenshot_20250926_001325.jpg)
+![Diff view and structured state snapshots](screenshots/Screenshot_20250926_001325.jpg)
 *Detail panel highlighting structured diffs, previous/current JSON snapshots, and metadata for a selected event.*
 
-![Search, filters, and GetX stream capture](../screenshots/Screenshot_20250926_001344.jpg)
+![Search, filters, and GetX stream capture](screenshots/Screenshot_20250926_001344.jpg)
 *Timeline search, event-kind filters, and a GetX counter emitting into the same session.*
 
-![Animated walk-through of the inspector overlay](../screenshots/movie.gif)
+![Animated walk-through of the inspector overlay](screenshots/movie.gif)
 *Animated tour showing pausing capture, pinning events, exporting sessions, and navigating diffs.*
 
 ## Getting started
