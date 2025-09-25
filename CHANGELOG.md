@@ -1,3 +1,8 @@
+## 0.1.2
+
+- README example section now showcases screenshots/GIF instead of build steps.
+- Removed internal publish checklist from public documentation.
+
 ## 0.1.1
 
 - Incremental release with README image assets included in the package.
