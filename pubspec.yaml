@@ -1,6 +1,6 @@
 name: enterprise_state_inspector
 description: Developer overlay for inspecting Riverpod and Bloc state changes in Flutter apps.
-version: 0.1.2
+version: 0.1.3
 homepage: https://tienenwu.me/
 repository: https://github.com/tienenwu/enterprise_state_inspector
 issue_tracker: https://github.com/tienenwu/enterprise_state_inspector/issues

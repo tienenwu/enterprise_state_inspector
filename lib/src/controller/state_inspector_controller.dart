@@ -1,13 +1,18 @@
+import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
+import '../model/state_annotation.dart';
+import '../model/state_attachment.dart';
 import '../model/state_change_record.dart';
 import '../model/state_diff_entry.dart';
 import '../model/state_snapshot.dart';
 import '../util/state_introspection.dart';
+import 'state_inspector_sync.dart';
+import 'state_timeline_analytics.dart';
 
 class _NoPreviousValue {
   const _NoPreviousValue();
@@ -19,12 +24,21 @@ const _noPreviousValue = _NoPreviousValue();
 class StateInspectorController extends ChangeNotifier {
   StateInspectorController({int maxRecords = 200})
       : assert(maxRecords > 0),
-        _maxRecords = maxRecords;
+        _maxRecords = maxRecords,
+        _recordStreamController =
+            StreamController<StateChangeRecord>.broadcast(),
+        _analyticsStreamController =
+            StreamController<StateTimelineAnalytics>.broadcast();
 
   static final StateInspectorController _instance =
       StateInspectorController._internal();
 
-  StateInspectorController._internal() : _maxRecords = 200;
+  StateInspectorController._internal()
+      : _maxRecords = 200,
+        _recordStreamController =
+            StreamController<StateChangeRecord>.broadcast(),
+        _analyticsStreamController =
+            StreamController<StateTimelineAnalytics>.broadcast();
 
   /// Accessor for a shared singleton controller when consumers do not wish to
   /// manage their own instance.
@@ -36,10 +50,23 @@ class StateInspectorController extends ChangeNotifier {
   bool _panelVisible = false;
   bool _isPaused = false;
   final Set<int> _pinned = <int>{};
+  final StreamController<StateChangeRecord> _recordStreamController;
+  final StreamController<StateTimelineAnalytics> _analyticsStreamController;
+  final List<StateInspectorSyncDelegate> _syncDelegates =
+      <StateInspectorSyncDelegate>[];
+  Set<String> _tagRegistry = <String>{};
+  StateTimelineAnalytics _analytics = StateTimelineAnalytics.empty();
 
   /// Exposes the recorded state changes as an unmodifiable view.
   UnmodifiableListView<StateChangeRecord> get records =>
       UnmodifiableListView<StateChangeRecord>(_records);
+
+  /// Stream that emits each new record as it is captured (for live tooling).
+  Stream<StateChangeRecord> get recordStream => _recordStreamController.stream;
+
+  /// Stream that emits analytics snapshots whenever the timeline changes.
+  Stream<StateTimelineAnalytics> get analyticsStream =>
+      _analyticsStreamController.stream;
 
   /// Returns whether the overlay panel is currently visible.
   bool get panelVisible => _panelVisible;
@@ -50,6 +77,16 @@ class StateInspectorController extends ChangeNotifier {
   /// IDs of pinned records.
   Set<int> get pinnedRecords => Set.unmodifiable(_pinned);
 
+  /// Aggregate analytics derived from the current timeline.
+  StateTimelineAnalytics get analytics => _analytics;
+
+  /// All tags referenced by records or annotations.
+  Set<String> get availableTags => Set.unmodifiable(_tagRegistry);
+
+  /// Registered sync delegates.
+  List<StateInspectorSyncDelegate> get syncDelegates =>
+      List.unmodifiable(_syncDelegates);
+
   /// Clear all recorded state changes.
   void clear() {
     if (_records.isEmpty) {
@@ -57,6 +94,11 @@ class StateInspectorController extends ChangeNotifier {
     }
     _records.clear();
     _pinned.clear();
+    _sequence = 0;
+    _refreshDerivedState();
+    for (final delegate in _syncDelegates) {
+      delegate.onRecordsCleared();
+    }
     notifyListeners();
   }
 
@@ -123,7 +165,12 @@ class StateInspectorController extends ChangeNotifier {
       final removed = _records.removeAt(0);
       _pinned.remove(removed.id);
     }
+    _refreshDerivedState();
     notifyListeners();
+    _recordStreamController.add(record);
+    for (final delegate in _syncDelegates) {
+      delegate.onRecordAdded(record);
+    }
   }
 
   /// Helper for creating and storing a record from primitive values.
@@ -139,20 +186,43 @@ class StateInspectorController extends ChangeNotifier {
     StateSnapshot? snapshot,
     StateSnapshot? previousSnapshot,
     List<StateDiffEntry>? diffs,
+    Iterable<String>? tags,
+    Map<String, num>? metrics,
+    Iterable<StateAnnotation>? annotations,
+    Iterable<StateAttachment>? attachments,
   }) {
     if (_isPaused) {
       return;
     }
-    final bool hasExplicitPrevious = !identical(previousState, _noPreviousValue);
+    final bool hasExplicitPrevious =
+        !identical(previousState, _noPreviousValue);
     final StateSnapshot currentSnapshot = snapshot ?? buildSnapshot(state);
     final StateSnapshot? resolvedPreviousSnapshot = previousSnapshot ??
         (hasExplicitPrevious ? buildSnapshot(previousState) : null);
-    final List<StateDiffEntry> resolvedDiffs = diffs ??
-        buildDiff(resolvedPreviousSnapshot, currentSnapshot);
+    final List<StateDiffEntry> resolvedDiffs =
+        diffs ?? buildDiff(resolvedPreviousSnapshot, currentSnapshot);
+
+    final int recordId = ++_sequence;
+    final Iterable<StateAnnotation> normalizedAnnotations =
+        annotations?.map((annotation) {
+              if (annotation.recordId == recordId) {
+                return annotation;
+              }
+              return annotation.copyWith(recordId: recordId);
+            }) ??
+            const <StateAnnotation>[];
+    final Iterable<StateAttachment> normalizedAttachments =
+        attachments?.map((attachment) {
+              if (attachment.recordId == recordId) {
+                return attachment;
+              }
+              return attachment.copyWith(recordId: recordId);
+            }) ??
+            const <StateAttachment>[];
 
     addRecord(
       StateChangeRecord(
-        id: ++_sequence,
+        id: recordId,
         origin: origin,
         kind: kind,
         timestamp: DateTime.now(),
@@ -164,6 +234,10 @@ class StateInspectorController extends ChangeNotifier {
         snapshot: currentSnapshot,
         previousSnapshot: resolvedPreviousSnapshot,
         diffs: resolvedDiffs,
+        tags: tags ?? const <String>[],
+        metrics: metrics ?? const <String, num>{},
+        annotations: normalizedAnnotations,
+        attachments: normalizedAttachments,
       ),
     );
   }
@@ -174,9 +248,8 @@ class StateInspectorController extends ChangeNotifier {
 
   /// Serialize the collected records as JSON (pretty printed when desired).
   String exportAsJson({bool pretty = false}) {
-    final encoder = pretty
-        ? const JsonEncoder.withIndent('  ')
-        : const JsonEncoder();
+    final encoder =
+        pretty ? const JsonEncoder.withIndent('  ') : const JsonEncoder();
     return encoder.convert(exportRecords());
   }
 
@@ -189,7 +262,7 @@ class StateInspectorController extends ChangeNotifier {
       }
     }
     return {
-      'version': 1,
+      'version': 2,
       if (label != null) 'label': label,
       'generatedAt': DateTime.now().toIso8601String(),
       'records': exportRecords(),
@@ -200,10 +273,50 @@ class StateInspectorController extends ChangeNotifier {
 
   /// Serialize the current session (with metadata) to JSON.
   String exportSessionJson({bool pretty = false, String? label}) {
-    final encoder = pretty
-        ? const JsonEncoder.withIndent('  ')
-        : const JsonEncoder();
+    final encoder =
+        pretty ? const JsonEncoder.withIndent('  ') : const JsonEncoder();
     return encoder.convert(exportSession(label: label));
+  }
+
+  /// Export the timeline as a Markdown summary suitable for tickets.
+  String exportAsMarkdown({int limit = 50}) {
+    final buffer = StringBuffer()
+      ..writeln('# State Timeline')
+      ..writeln();
+    final recent = _records.reversed.take(limit).toList().reversed;
+    for (final record in recent) {
+      buffer.writeln(
+          '- **${record.timestamp.toIso8601String()}** · `${record.origin}` · `${record.kind.name}` — ${record.summary}');
+      if (record.previousSummary != null) {
+        buffer.writeln('  - Previous: ${record.previousSummary}');
+      }
+      if (record.diffs.isNotEmpty) {
+        buffer.writeln(
+            '  - Diff paths: ${record.diffs.map((d) => d.pathAsString).join(', ')}');
+      }
+      if (record.tags.isNotEmpty) {
+        buffer.writeln('  - Tags: ${record.tags.join(', ')}');
+      }
+      if (record.annotations.isNotEmpty) {
+        for (final annotation in record.annotations) {
+          buffer.writeln(
+              '  - Note (${annotation.severity.name}): ${annotation.message}');
+        }
+      }
+    }
+    return buffer.toString();
+  }
+
+  /// Export a lightweight CLI table (pipe separated) for logs.
+  String exportAsCliTable({int limit = 100}) {
+    final buffer = StringBuffer()
+      ..writeln('timestamp|origin|kind|summary|tags');
+    final recent = _records.reversed.take(limit).toList().reversed;
+    for (final record in recent) {
+      buffer.writeln(
+          '${record.timestamp.toIso8601String()}|${record.origin}|${record.kind.name}|${record.summary}|${record.tags.join(',')}');
+    }
+    return buffer.toString();
   }
 
   /// Replace the current timeline with records from a JSON string.
@@ -256,9 +369,191 @@ class StateInspectorController extends ChangeNotifier {
       ..clear()
       ..addAll(pinnedIds);
 
-    _sequence = _records.fold<int>(0,
-        (currentMax, record) => math.max(currentMax, record.id));
+    _sequence = _records.fold<int>(
+        0, (currentMax, record) => math.max(currentMax, record.id));
 
+    _refreshDerivedState();
     notifyListeners();
+
+    for (final delegate in _syncDelegates) {
+      delegate.onBulkImport(List<StateChangeRecord>.from(_records));
+    }
+  }
+
+  /// Attach an annotation to a record and notify listeners.
+  StateChangeRecord? addAnnotation(
+    int recordId,
+    StateAnnotation annotation,
+  ) {
+    final index = _records.indexWhere((record) => record.id == recordId);
+    if (index == -1) {
+      return null;
+    }
+    final record = _records[index];
+    final nextAnnotations = <StateAnnotation>[
+      ...record.annotations.where((entry) => entry.id != annotation.id),
+      annotation,
+    ];
+    final updated = record.copyWith(annotations: nextAnnotations);
+    _records[index] = updated;
+    _refreshDerivedState();
+    notifyListeners();
+    for (final delegate in _syncDelegates) {
+      delegate.onRecordMutated(updated);
+    }
+    return updated;
+  }
+
+  /// Remove an annotation by id.
+  bool removeAnnotation(int recordId, String annotationId) {
+    final index = _records.indexWhere((record) => record.id == recordId);
+    if (index == -1) {
+      return false;
+    }
+    final record = _records[index];
+    final filtered =
+        record.annotations.where((entry) => entry.id != annotationId).toList();
+    if (filtered.length == record.annotations.length) {
+      return false;
+    }
+    _records[index] = record.copyWith(annotations: filtered);
+    _refreshDerivedState();
+    notifyListeners();
+    for (final delegate in _syncDelegates) {
+      delegate.onRecordMutated(_records[index]);
+    }
+    return true;
+  }
+
+  /// Merge new tags into a record.
+  StateChangeRecord? addTags(int recordId, Iterable<String> tags) {
+    final index = _records.indexWhere((record) => record.id == recordId);
+    if (index == -1) {
+      return null;
+    }
+    final record = _records[index];
+    final merged = <String>{...record.tags, ...tags};
+    final updated = record.copyWith(tags: merged);
+    _records[index] = updated;
+    _refreshDerivedState();
+    notifyListeners();
+    for (final delegate in _syncDelegates) {
+      delegate.onRecordMutated(updated);
+    }
+    return updated;
+  }
+
+  /// Replace the tag list for a record.
+  StateChangeRecord? setTags(int recordId, Iterable<String> tags) {
+    final index = _records.indexWhere((record) => record.id == recordId);
+    if (index == -1) {
+      return null;
+    }
+    final updated = _records[index].copyWith(tags: tags);
+    _records[index] = updated;
+    _refreshDerivedState();
+    notifyListeners();
+    for (final delegate in _syncDelegates) {
+      delegate.onRecordMutated(updated);
+    }
+    return updated;
+  }
+
+  /// Attach rich-media artifact metadata to a record.
+  StateChangeRecord? addAttachment(
+    int recordId,
+    StateAttachment attachment,
+  ) {
+    final index = _records.indexWhere((record) => record.id == recordId);
+    if (index == -1) {
+      return null;
+    }
+    final record = _records[index];
+    final merged = <StateAttachment>[
+      ...record.attachments.where((entry) => entry.id != attachment.id),
+      attachment,
+    ];
+    final updated = record.copyWith(attachments: merged);
+    _records[index] = updated;
+    _refreshDerivedState();
+    notifyListeners();
+    for (final delegate in _syncDelegates) {
+      delegate.onRecordMutated(updated);
+    }
+    return updated;
+  }
+
+  /// Remove an attachment from a record using its id.
+  bool removeAttachment(int recordId, String attachmentId) {
+    final index = _records.indexWhere((record) => record.id == recordId);
+    if (index == -1) {
+      return false;
+    }
+    final record = _records[index];
+    final filtered =
+        record.attachments.where((entry) => entry.id != attachmentId).toList();
+    if (filtered.length == record.attachments.length) {
+      return false;
+    }
+    _records[index] = record.copyWith(attachments: filtered);
+    _refreshDerivedState();
+    notifyListeners();
+    for (final delegate in _syncDelegates) {
+      delegate.onRecordMutated(_records[index]);
+    }
+    return true;
+  }
+
+  /// Merge metrics into a record.
+  StateChangeRecord? mergeMetrics(
+    int recordId,
+    Map<String, num> metrics,
+  ) {
+    final index = _records.indexWhere((record) => record.id == recordId);
+    if (index == -1) {
+      return null;
+    }
+    final record = _records[index];
+    final merged = Map<String, num>.from(record.metrics)..addAll(metrics);
+    final updated = record.copyWith(metrics: merged);
+    _records[index] = updated;
+    _refreshDerivedState();
+    notifyListeners();
+    for (final delegate in _syncDelegates) {
+      delegate.onRecordMutated(updated);
+    }
+    return updated;
+  }
+
+  /// Register a sync delegate that mirrors timeline changes remotely.
+  void addSyncDelegate(StateInspectorSyncDelegate delegate) {
+    _syncDelegates.add(delegate);
+  }
+
+  /// Remove a previously registered sync delegate.
+  void removeSyncDelegate(StateInspectorSyncDelegate delegate) {
+    _syncDelegates.remove(delegate);
+  }
+
+  @override
+  void dispose() {
+    _recordStreamController.close();
+    _analyticsStreamController.close();
+    super.dispose();
+  }
+
+  void _refreshDerivedState() {
+    _analytics = StateTimelineAnalytics.fromRecords(_records);
+    if (!_analyticsStreamController.isClosed) {
+      _analyticsStreamController.add(_analytics);
+    }
+    final tags = <String>{};
+    for (final record in _records) {
+      tags.addAll(record.tags);
+      for (final annotation in record.annotations) {
+        tags.addAll(annotation.tags);
+      }
+    }
+    _tagRegistry = tags;
   }
 }

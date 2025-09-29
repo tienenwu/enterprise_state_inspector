@@ -44,7 +44,8 @@ String prettyPrintValue(Object? value) {
   }
 }
 
-String describeError(Object error, StackTrace stackTrace, {int maxChars = 200}) {
+String describeError(Object error, StackTrace stackTrace,
+    {int maxChars = 200}) {
   final message = '$error\n$stackTrace';
   if (message.length <= maxChars) {
     return message;

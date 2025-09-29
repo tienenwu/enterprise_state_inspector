@@ -1,3 +1,5 @@
+import 'state_annotation.dart';
+import 'state_attachment.dart';
 import 'state_diff_entry.dart';
 import 'state_snapshot.dart';
 
@@ -25,8 +27,18 @@ class StateChangeRecord {
     this.snapshot = const StateSnapshot(),
     this.previousSnapshot,
     List<StateDiffEntry> diffs = const <StateDiffEntry>[],
+    Iterable<String> tags = const <String>[],
+    Map<String, num> metrics = const <String, num>{},
+    Iterable<StateAnnotation> annotations = const <StateAnnotation>[],
+    Iterable<StateAttachment> attachments = const <StateAttachment>[],
   })  : _details = Map.unmodifiable(details),
-        diffs = List.unmodifiable(diffs);
+        diffs = List.unmodifiable(diffs),
+        tags = List.unmodifiable(
+          tags.map((tag) => tag.trim()).where((tag) => tag.isNotEmpty),
+        ),
+        metrics = Map.unmodifiable(metrics),
+        annotations = List.unmodifiable(annotations),
+        attachments = List.unmodifiable(attachments);
 
   /// Sequence number; monotonic increasing for ordering.
   final int id;
@@ -66,6 +78,18 @@ class StateChangeRecord {
   /// Structural differences between [previousSnapshot] and [snapshot].
   final List<StateDiffEntry> diffs;
 
+  /// Classification tags attached to this record (for filtering/grouping).
+  final List<String> tags;
+
+  /// Quantitative metrics captured during this change (duration, counts, etc.).
+  final Map<String, num> metrics;
+
+  /// Developer-authored annotations to provide additional insight.
+  final List<StateAnnotation> annotations;
+
+  /// External artifacts (screenshots, recordings) linked to this record.
+  final List<StateAttachment> attachments;
+
   /// String-friendly representation for serialization or logs.
   Map<String, Object?> toJson() {
     return {
@@ -85,23 +109,36 @@ class StateChangeRecord {
         'previousSnapshot': previousSnapshot?.toJson(),
       if (diffs.isNotEmpty)
         'diffs': diffs.map((entry) => entry.toJson()).toList(),
+      if (tags.isNotEmpty) 'tags': tags,
+      if (metrics.isNotEmpty) 'metrics': metrics,
+      if (annotations.isNotEmpty)
+        'annotations': annotations.map((e) => e.toJson()).toList(),
+      if (attachments.isNotEmpty)
+        'attachments': attachments.map((e) => e.toJson()).toList(),
     };
   }
 
   factory StateChangeRecord.fromJson(Map<String, Object?> json) {
     final kindName = json['kind'] as String? ?? StateEventKind.update.name;
-    final kind = StateEventKind.values
-        .firstWhere((value) => value.name == kindName, orElse: () => StateEventKind.update);
+    final kind = StateEventKind.values.firstWhere(
+      (value) => value.name == kindName,
+      orElse: () => StateEventKind.update,
+    );
 
     final snapshotJson = json['snapshot'];
     final previousSnapshotJson = json['previousSnapshot'];
     final diffsJson = json['diffs'];
+    final tagsJson = json['tags'];
+    final metricsJson = json['metrics'];
+    final annotationsJson = json['annotations'];
+    final attachmentsJson = json['attachments'];
 
     return StateChangeRecord(
       id: (json['id'] as num?)?.toInt() ?? 0,
       origin: json['origin'] as String? ?? 'unknown',
       kind: kind,
-      timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ?? DateTime.now(),
+      timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ??
+          DateTime.now(),
       summary: json['summary'] as String? ?? '',
       previousSummary: json['previousSummary'] as String?,
       runtimeTypeName: json['runtimeType'] as String?,
@@ -119,6 +156,26 @@ class StateChangeRecord {
               .map(StateDiffEntry.fromJson)
               .toList()
           : const <StateDiffEntry>[],
+      tags: tagsJson is Iterable
+          ? tagsJson.map((entry) => entry.toString())
+          : const <String>[],
+      metrics: metricsJson is Map
+          ? metricsJson.map(
+              (key, value) => MapEntry(key.toString(), _parseNum(value)),
+            )
+          : const <String, num>{},
+      annotations: annotationsJson is List
+          ? annotationsJson
+              .whereType<Map<String, Object?>>()
+              .map(StateAnnotation.fromJson)
+              .toList()
+          : const <StateAnnotation>[],
+      attachments: attachmentsJson is List
+          ? attachmentsJson
+              .whereType<Map<String, Object?>>()
+              .map(StateAttachment.fromJson)
+              .toList()
+          : const <StateAttachment>[],
     );
   }
 
@@ -135,6 +192,10 @@ class StateChangeRecord {
     StateSnapshot? snapshot,
     StateSnapshot? previousSnapshot,
     List<StateDiffEntry>? diffs,
+    Iterable<String>? tags,
+    Map<String, num>? metrics,
+    Iterable<StateAnnotation>? annotations,
+    Iterable<StateAttachment>? attachments,
   }) {
     return StateChangeRecord(
       id: id ?? this.id,
@@ -149,6 +210,10 @@ class StateChangeRecord {
       snapshot: snapshot ?? this.snapshot,
       previousSnapshot: previousSnapshot ?? this.previousSnapshot,
       diffs: diffs ?? this.diffs,
+      tags: tags ?? this.tags,
+      metrics: metrics ?? this.metrics,
+      annotations: annotations ?? this.annotations,
+      attachments: attachments ?? this.attachments,
     );
   }
 }
@@ -158,4 +223,14 @@ Map<String, Object?> _castDetails(Object? value) {
     return value.map((key, dynamic entry) => MapEntry(key.toString(), entry));
   }
   return const {};
+}
+
+num _parseNum(Object? value) {
+  if (value is num) {
+    return value;
+  }
+  if (value is String) {
+    return num.tryParse(value) ?? 0;
+  }
+  return 0;
 }

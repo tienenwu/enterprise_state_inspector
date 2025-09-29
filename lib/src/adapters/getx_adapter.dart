@@ -27,7 +27,8 @@ class StateInspectorGetAdapter {
     inspector.capture(
       origin: origin,
       kind: StateEventKind.add,
-      summary: summaryBuilder?.call(initialValue) ?? describeValue(initialValue),
+      summary:
+          summaryBuilder?.call(initialValue) ?? describeValue(initialValue),
       state: initialValue,
       runtimeTypeName: runtime,
       snapshot: buildSnapshot(initialValue),

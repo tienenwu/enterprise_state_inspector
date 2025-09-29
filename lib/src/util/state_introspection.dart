@@ -35,10 +35,7 @@ Object? _normalize(
   int maxDepth,
   Set<int> visited,
 ) {
-  if (value == null ||
-      value is num ||
-      value is bool ||
-      value is String) {
+  if (value == null || value is num || value is bool || value is String) {
     return value;
   }
 
@@ -150,16 +147,16 @@ void _diffRecursive(
   }
 
   if (previous is List && current is List) {
-    final length = previous.length > current.length
-        ? previous.length
-        : current.length;
+    final length =
+        previous.length > current.length ? previous.length : current.length;
     for (var index = 0; index < length; index += 1) {
       if (results.length >= maxEntries) {
         return;
       }
       final prevValue = index < previous.length ? previous[index] : null;
       final currValue = index < current.length ? current[index] : null;
-      _diffRecursive(prevValue, currValue, [...path, index], results, maxEntries);
+      _diffRecursive(
+          prevValue, currValue, [...path, index], results, maxEntries);
     }
     return;
   }

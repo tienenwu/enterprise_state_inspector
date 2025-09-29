@@ -64,8 +64,9 @@ class StateDiffEntry {
     }
 
     final kindName = json['kind'] as String? ?? StateDiffKind.changed.name;
-    final kind = StateDiffKind.values
-        .firstWhere((value) => value.name == kindName, orElse: () => StateDiffKind.changed);
+    final kind = StateDiffKind.values.firstWhere(
+        (value) => value.name == kindName,
+        orElse: () => StateDiffKind.changed);
 
     return StateDiffEntry(
       path: pathSegments,

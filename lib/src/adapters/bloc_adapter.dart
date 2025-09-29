@@ -40,12 +40,14 @@ class StateInspectorBlocObserver extends BlocObserver {
   }
 
   @override
-  void onTransition(Bloc<dynamic, dynamic> bloc, Transition<dynamic, dynamic> transition) {
+  void onTransition(
+      Bloc<dynamic, dynamic> bloc, Transition<dynamic, dynamic> transition) {
     super.onTransition(bloc, transition);
     _controller.capture(
       origin: _label(bloc),
       kind: StateEventKind.transition,
-      summary: '${transition.event.runtimeType}: ${describeValue(transition.nextState)}',
+      summary:
+          '${transition.event.runtimeType}: ${describeValue(transition.nextState)}',
       previousSummary: describeValue(transition.currentState),
       runtimeTypeName: bloc.runtimeType.toString(),
       state: transition.nextState,
